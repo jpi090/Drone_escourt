@@ -1,0 +1,16 @@
+{
+  "name": "drone-escorts",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Drone Escorts — supervised aerial escort platform (Phase 1)",
+  "main": "server/server.js",
+  "scripts": {
+    "start": "node server/server.js",
+    "dev": "node --watch server/server.js",
+    "test": "node test/api.test.js"
+  },
+  "engines": {
+    "node": ">=22.5"
+  },
+  "dependencies": {}
+}

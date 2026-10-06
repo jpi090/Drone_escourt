@@ -1,0 +1,15 @@
+services:
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      PORT: 3000
+      DB_PATH: /app/data/escorts.db
+      # Set true when serving over HTTPS behind a proxy.
+      COOKIE_SECURE: "false"
+    volumes:
+      - escort-data:/app/data
+    restart: unless-stopped
+volumes:
+  escort-data:

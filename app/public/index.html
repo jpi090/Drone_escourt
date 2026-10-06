@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Drone Escorts</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- ===================== AUTH ===================== -->
+<div id="auth">
+  <div class="auth-card">
+    <div class="brand"><span class="dot"></span>DRONE ESCORTS</div>
+    <div class="tag">Supervised aerial escort for journeys that carry risk.</div>
+
+    <div class="tabs" role="group">
+      <button id="tabLogin" aria-pressed="true">Sign in</button>
+      <button id="tabRegister" aria-pressed="false">Create account</button>
+    </div>
+
+    <form id="authForm" autocomplete="on">
+      <div id="nameRow" hidden>
+        <label class="fld" for="aName">Full name</label>
+        <input type="text" id="aName" autocomplete="name" placeholder="Amina Bello">
+      </div>
+      <label class="fld" for="aEmail">Email</label>
+      <input type="email" id="aEmail" autocomplete="email" required placeholder="you@example.com">
+      <label class="fld" for="aPass">Password</label>
+      <input type="password" id="aPass" autocomplete="current-password" required
+             minlength="8" placeholder="at least 8 characters">
+      <div id="roleRow" hidden>
+        <label class="fld">Account type</label>
+        <div class="seg" role="group">
+          <button type="button" data-role="subscriber" aria-pressed="true">Subscriber</button>
+          <button type="button" data-role="operator" aria-pressed="false">Security operator</button>
+        </div>
+      </div>
+      <div class="err" id="authErr"></div>
+      <button class="btn btn-primary" id="authGo" type="submit">Sign in</button>
+    </form>
+
+    <div class="auth-note">
+      Create one subscriber account and one operator account to see both sides. Open the operator
+      account in a second browser or a private window — alerts appear there live.
+    </div>
+  </div>
+</div>
+
+<!-- ===================== APP ===================== -->
+<header hidden id="chrome">
+  <div class="brand"><span class="dot"></span>DRONE ESCORTS</div>
+  <span class="tagchip" id="srcChip">—</span>
+  <span class="tagchip" id="linkChip">CONNECTING</span>
+  <div class="roles" role="group" id="roleSwitch" hidden>
+    <button id="rSub" aria-pressed="true">Subscriber</button>
+    <button id="rOps" aria-pressed="false">Command (SOC)</button>
+  </div>
+  <div class="who">
+    <span id="whoName"></span>
+    <span class="clock" id="clock">--:--:--</span>
+    <button class="btn-sm" id="btnLogout">Sign out</button>
+  </div>
+</header>
+
+<main hidden id="app">
+  <div class="col" id="colLeft"></div>
+  <div class="map-wrap"><div id="map"></div></div>
+  <div class="col" id="colRight"></div>
+</main>
+
+<div class="sos-frame" id="sosFrame" hidden></div>
+
+<div class="ovl" id="sosModal" hidden>
+  <div class="sheet">
+    <h2>Emergency SOS</h2>
+    <p>Releasing this alert notifies the operations centre, your emergency contacts, and begins
+       protected recording. Cancel within the window if this was accidental.</p>
+    <div class="count" id="sosCount">5</div>
+    <button class="btn btn-ghost" id="sosCancel">Cancel — I'm safe</button>
+    <button class="btn btn-sos" id="sosNow" style="margin-top:8px">Send now</button>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
