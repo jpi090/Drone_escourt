@@ -3,17 +3,482 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Drone Escorts</title>
+<title>Drone Escorts — Supervised Aerial Escort Platform</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 
-<!-- ===================== AUTH ===================== -->
-<div id="auth">
+<!-- ===================== GLOBAL TOP NAVIGATION ===================== -->
+<nav id="siteNav">
+  <div class="nav-container">
+    <div class="nav-brand" id="brandHomeBtn" role="button" tabindex="0">
+      <span class="radar-pulse"></span>
+      <div class="brand-text">
+        <span class="brand-title">DRONE ESCORTS</span>
+        <span class="brand-sub">AERIAL DEFENSE PLATFORM</span>
+      </div>
+    </div>
+
+    <div class="nav-links">
+      <button class="nav-link active" data-nav="home">Overview</button>
+      <button class="nav-link" data-nav="fleet">Fleet Status</button>
+      <button class="nav-link" data-nav="architecture">Safety &amp; SRS</button>
+      <button class="nav-link" data-nav="pricing">Economics</button>
+      <button class="nav-link nav-console-btn" id="navConsoleBtn">
+        <span class="pulse-dot"></span> Mission Console
+      </button>
+    </div>
+
+    <div class="nav-actions">
+      <!-- Unauthenticated View -->
+      <div id="navGuestActions" class="nav-group">
+        <div class="quick-demo-dropdown">
+          <button class="btn btn-demo-quick" id="btnQuickDemo">
+            <span>⚡ Demo</span> ▾
+          </button>
+          <div class="demo-menu" id="demoMenu">
+            <button class="demo-menu-item" id="menuDemoSub">
+              <strong>Subscriber Mode</strong>
+              <small>Mobile user view, live map, SOS button</small>
+            </button>
+            <button class="demo-menu-item" id="menuDemoOps">
+              <strong>Security Operator (SOC)</strong>
+              <small>Fleet command, triage queue, SLA timer</small>
+            </button>
+          </div>
+        </div>
+        <button class="btn btn-outline-sm" id="btnOpenAuth">Sign in</button>
+        <button class="btn btn-primary-sm" id="btnOpenRegister">Get started</button>
+      </div>
+
+      <!-- Authenticated View -->
+      <div id="navUserActions" class="nav-group" hidden>
+        <div class="user-pill">
+          <span class="user-avatar" id="navUserAvatar">U</span>
+          <div class="user-details">
+            <span class="user-name" id="navUserName">Demo User</span>
+            <span class="user-role-badge" id="navUserRole">Subscriber</span>
+          </div>
+        </div>
+        <button class="btn btn-outline-sm" id="navSignOutBtn">Sign out</button>
+      </div>
+
+      <!-- Mobile Hamburger Toggle -->
+      <button class="nav-mobile-toggle" id="btnNavToggle" aria-label="Toggle navigation menu">
+        <span class="bar1"></span>
+        <span class="bar2"></span>
+        <span class="bar3"></span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Mobile Drawer Menu -->
+  <div class="mobile-nav-drawer" id="mobileNavDrawer" hidden>
+    <div class="mobile-nav-links">
+      <button class="m-nav-link active" data-nav="home">Overview</button>
+      <button class="m-nav-link" data-nav="fleet">Fleet Status</button>
+      <button class="m-nav-link" data-nav="architecture">Safety &amp; SRS</button>
+      <button class="m-nav-link" data-nav="pricing">Economics</button>
+      <button class="m-nav-link m-console-btn" id="mNavConsoleBtn">
+        <span class="pulse-dot"></span> Mission Console
+      </button>
+    </div>
+  </div>
+</nav>
+
+<!-- ===================== HOME / OVERVIEW VIEW ===================== -->
+<div id="homeView">
+  <!-- HERO SECTION -->
+  <section class="hero-section" id="overview">
+    <div class="hero-bg-glow"></div>
+    <div class="container hero-container">
+      <div class="hero-content">
+        <div class="hero-badge">
+          <span class="badge-dot"></span>
+          <span>PHASE 1 OPERATIONAL PLATFORM · SERVER-AUTHORITATIVE AIRSPACE</span>
+        </div>
+        <h1 class="hero-title">
+          Supervised Aerial Escort for Journeys That Carry Risk.
+        </h1>
+        <p class="hero-desc">
+          On-demand autonomous quadcopters provide protective overhead surveillance with stand-off positioning, 
+          server-enforced battery reserve fail-safes, real-time vehicle tracking, and dedicated SOC operator triage.
+        </p>
+
+        <div class="hero-cta-group">
+          <button class="btn btn-hero-primary" id="heroLaunchSub">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+            Launch Escort Demo
+          </button>
+          <button class="btn btn-hero-secondary" id="heroLaunchOps">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+            SOC Command Center
+          </button>
+        </div>
+
+        <div class="hero-stats-row">
+          <div class="hero-stat-card">
+            <span class="stat-value">22%</span>
+            <span class="stat-label">Hard Battery Reserve Floor</span>
+          </div>
+          <div class="hero-stat-card">
+            <span class="stat-value">&lt; 10s</span>
+            <span class="stat-label">Emergency SOS Triage SLA</span>
+          </div>
+          <div class="hero-stat-card">
+            <span class="stat-value">100%</span>
+            <span class="stat-label">Human RPIC Oversight</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="hero-visual">
+        <div class="hud-frame">
+          <div class="hud-corner tl"></div>
+          <div class="hud-corner tr"></div>
+          <div class="hud-corner bl"></div>
+          <div class="hud-corner br"></div>
+          
+          <img src="hero-drone.jpg" alt="Autonomous Drone Escort at Night" class="hud-hero-img">
+          
+          <div class="hud-overlay-top">
+            <div class="hud-tag"><span class="live-rec"></span> REC · ENCRYPTED STREAM</div>
+            <div class="hud-tag-mono">SYS: DE-114 · SENTINEL X2</div>
+          </div>
+          
+          <div class="hud-reticle">
+            <div class="reticle-box">
+              <span class="reticle-label">TARGET LOCKED · VEHICLE LAG-4421</span>
+            </div>
+          </div>
+
+          <div class="hud-overlay-bottom">
+            <div class="hud-telemetry-badge">
+              <span class="tele-val">ALT: 42.5m</span>
+              <span class="tele-val">SPD: 48 km/h</span>
+              <span class="tele-val">STANDOFF: 28m</span>
+            </div>
+            <div class="hud-compliance-badge">
+              <span>RC-7 BYSTANDER BLUR ACTIVE</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- DUAL EXPERIENCE SHOWCASE -->
+  <section class="section showcase-section" id="dual-demo">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-tag">TWO LIVE ROLES · ONE SYNCHRONIZED ENGINE</span>
+        <h2 class="section-title">Experience the Dual Architecture</h2>
+        <p class="section-subtitle">
+          Open two windows to see the magic: an action taken on the subscriber's phone reflects instantly on the operator's command console via real-time Server-Sent Events.
+        </p>
+      </div>
+
+      <div class="showcase-grid">
+        <!-- Subscriber Card -->
+        <div class="showcase-card showcase-sub">
+          <div class="card-glow"></div>
+          <div class="showcase-header">
+            <div class="showcase-icon-wrap sub-accent">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+            </div>
+            <div>
+              <span class="showcase-pill sub-pill">MOBILE / VEHICLE VIEW</span>
+              <h3 class="showcase-h3">Subscriber Console</h3>
+            </div>
+          </div>
+          <p class="showcase-desc">
+            Designed for commuters, high-profile travelers, and nighttime journeys. Request an escort, configure transport mode (Car, Walking, Cycling, VIP Convoy), and track your drone in real-time.
+          </p>
+          <ul class="feature-bullets">
+            <li><strong>Pre-Flight Gate:</strong> Enforces server-side airframe inspection and battery minimums.</li>
+            <li><strong>Synthetic Gimbal Feed:</strong> Artificial horizon, vehicle tracking reticle, and privacy blurring.</li>
+            <li><strong>2-Stage SOS Button:</strong> 5-second cancel buffer prevents false alarms, then notifies emergency dispatch.</li>
+            <li><strong>Real Phone GPS or Desk Sim:</strong> Stream genuine phone coordinates or test simulated routes.</li>
+          </ul>
+          <button class="btn btn-primary" id="btnLaunchSubCard">
+            Launch Subscriber Experience →
+          </button>
+        </div>
+
+        <!-- Operator Card -->
+        <div class="showcase-card showcase-ops">
+          <div class="card-glow"></div>
+          <div class="showcase-header">
+            <div class="showcase-icon-wrap ops-accent">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+            </div>
+            <div>
+              <span class="showcase-pill ops-pill">SECURITY OPERATIONS (SOC)</span>
+              <h3 class="showcase-h3">Command Dashboard</h3>
+            </div>
+          </div>
+          <p class="showcase-desc">
+            The mission control interface for Remote Pilots in Command (RPIC) and tactical security dispatchers to monitor the fleet and respond to threats.
+          </p>
+          <ul class="feature-bullets">
+            <li><strong>SLA Emergency Queue:</strong> Live urgency timers tracking time-to-acknowledge and time-to-escalate.</li>
+            <li><strong>Live Threat Advisories:</strong> Broadcast human-confirmed route warnings directly to subscribers.</li>
+            <li><strong>Multi-Airframe Oversight:</strong> Monitor simultaneous escorts across city corridors.</li>
+            <li><strong>Append-Only Audit Log:</strong> Cryptographic, tamper-proof record of every pilot and system decision.</li>
+          </ul>
+          <button class="btn btn-secondary-accent" id="btnLaunchOpsCard">
+            Launch SOC Command Board →
+          </button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- LIVE FLEET READINESS -->
+  <section class="section fleet-section" id="fleet">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-tag">AIRCRAFT AVAILABILITY</span>
+        <h2 class="section-title">Active Fleet Readiness</h2>
+        <p class="section-subtitle">
+          Real-time status of deployed airframes and charging docks across regional hubs.
+        </p>
+      </div>
+
+      <div class="fleet-cards-grid">
+        <div class="fleet-drone-card ready">
+          <div class="drone-card-top">
+            <span class="drone-id-badge">DE-114</span>
+            <span class="drone-status-pill status-ready">● FLIGHT READY</span>
+          </div>
+          <div class="drone-model">Sentinel X2 · Long-Range Escort</div>
+          <div class="battery-meter-container">
+            <div class="battery-labels">
+              <span>Battery Level</span>
+              <strong class="color-green">97%</strong>
+            </div>
+            <div class="meter-bar"><div class="meter-fill fill-green" style="width: 97%"></div></div>
+          </div>
+          <div class="drone-meta-grid">
+            <div class="meta-item"><span class="meta-lbl">Dock Location</span><span class="meta-val">Vehicle dock · LAG-4421</span></div>
+            <div class="meta-item"><span class="meta-lbl">Flight Cycles</span><span class="meta-val">184 cycles</span></div>
+            <div class="meta-item"><span class="meta-lbl">Firmware</span><span class="meta-val">v4.2.1-sec</span></div>
+            <div class="meta-item"><span class="meta-lbl">Airworthiness</span><span class="meta-val color-green">Verified (RPIC)</span></div>
+          </div>
+        </div>
+
+        <div class="fleet-drone-card charging">
+          <div class="drone-card-top">
+            <span class="drone-id-badge">DE-087</span>
+            <span class="drone-status-pill status-charging">⚡ DOCKED &amp; RECHARGING</span>
+          </div>
+          <div class="drone-model">Sentinel X2 · Rapid Deployment</div>
+          <div class="battery-meter-container">
+            <div class="battery-labels">
+              <span>Battery Level</span>
+              <strong class="color-yellow">62%</strong>
+            </div>
+            <div class="meter-bar"><div class="meter-fill fill-yellow" style="width: 62%"></div></div>
+          </div>
+          <div class="drone-meta-grid">
+            <div class="meta-item"><span class="meta-lbl">Dock Location</span><span class="meta-val">Hub · Lekki Phase 1</span></div>
+            <div class="meta-item"><span class="meta-lbl">Flight Cycles</span><span class="meta-val">402 cycles</span></div>
+            <div class="meta-item"><span class="meta-lbl">Firmware</span><span class="meta-val">v4.2.1-sec</span></div>
+            <div class="meta-item"><span class="meta-lbl">Airworthiness</span><span class="meta-val color-green">Nominal</span></div>
+          </div>
+        </div>
+
+        <div class="fleet-drone-card maintenance">
+          <div class="drone-card-top">
+            <span class="drone-id-badge">DE-203</span>
+            <span class="drone-status-pill status-grounded">✕ MAINTENANCE LOCK</span>
+          </div>
+          <div class="drone-model">Sentinel X1 · High-Payload Escort</div>
+          <div class="battery-meter-container">
+            <div class="battery-labels">
+              <span>Battery Level</span>
+              <strong class="color-cyan">88%</strong>
+            </div>
+            <div class="meter-bar"><div class="meter-fill fill-cyan" style="width: 88%"></div></div>
+          </div>
+          <div class="drone-meta-grid">
+            <div class="meta-item"><span class="meta-lbl">Dock Location</span><span class="meta-val">Hub · Ikeja Base</span></div>
+            <div class="meta-item"><span class="meta-lbl">Flight Cycles</span><span class="meta-val">912 cycles</span></div>
+            <div class="meta-item"><span class="meta-lbl">Status</span><span class="meta-val color-red">Inspection Overdue</span></div>
+            <div class="meta-item"><span class="meta-lbl">Pre-Flight Gate</span><span class="meta-val color-red">Launch Refused</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ARCHITECTURE & SRS SAFETY -->
+  <section class="section arch-section" id="architecture">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-tag">SRS COMPLIANCE &amp; ETHICS</span>
+        <h2 class="section-title">Built on Binding Regulatory Constraints</h2>
+        <p class="section-subtitle">
+          Safety is enforced by the server state machine, not client-side checkboxes.
+        </p>
+      </div>
+
+      <div class="arch-grid">
+        <div class="arch-card">
+          <div class="arch-icon">🛡️</div>
+          <h3>Server-Authoritative Flight Gate</h3>
+          <p>
+            The server refuses launch requests if battery is under minimum or airframe maintenance is due. 
+            The client cannot coerce the drone into an unsafe state.
+          </p>
+        </div>
+
+        <div class="arch-card">
+          <div class="arch-icon">⚡</div>
+          <h3>Hard 22% Reserve Return</h3>
+          <p>
+            When battery discharge reaches 22%, the system automatically overrides mission commands and initiates Return-to-Dock to eliminate crash-landings.
+          </p>
+        </div>
+
+        <div class="arch-card">
+          <div class="arch-icon">👁️</div>
+          <h3>Zero Autonomous Person Classification</h3>
+          <p>
+            In strict compliance with RC-5 and privacy regulations, the platform never automatically classifies persons or applies facial recognition. Bystanders are blurred.
+          </p>
+        </div>
+
+        <div class="arch-card">
+          <div class="arch-icon">📜</div>
+          <h3>Append-Only Audit Log</h3>
+          <p>
+            Every alert, operator acknowledgment, escalation, and flight abort is permanently recorded in an append-only log with precise timestamps and actor attribution.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- BUSINESS MODEL & PRICING -->
+  <section class="section pricing-section" id="pricing">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-tag">INVESTOR ECONOMICS &amp; TIERS</span>
+        <h2 class="section-title">Platform Unit Economics</h2>
+        <p class="section-subtitle">
+          Asset-light, partner-first commercialization with scalable pilot-to-drone multi-supervision.
+        </p>
+      </div>
+
+      <div class="pricing-grid">
+        <div class="pricing-card">
+          <div class="pricing-tier">On-Demand Escort</div>
+          <div class="pricing-price">$35<span>/journey</span></div>
+          <p class="pricing-summary">Pay-as-you-go aerial coverage for individual risky commutes.</p>
+          <ul class="pricing-features">
+            <li>✓ Single journey up to 35 mins</li>
+            <li>✓ 2-Stage emergency SOS</li>
+            <li>✓ OpenStreetMap telemetry link</li>
+            <li>✓ Automated emergency contact dispatch</li>
+          </ul>
+          <button class="btn btn-outline" id="btnSelectPersonal">Select Plan</button>
+        </div>
+
+        <div class="pricing-card featured">
+          <div class="featured-badge">MOST POPULAR · DEMO DEFAULT</div>
+          <div class="pricing-tier">Fleet Subscriber</div>
+          <div class="pricing-price">$240<span>/month</span></div>
+          <p class="pricing-summary">Complete coverage for executives, families, and regular travelers.</p>
+          <ul class="pricing-features">
+            <li>✓ 12 escort journeys included monthly</li>
+            <li>✓ Priority airframe dock reservation</li>
+            <li>✓ Dedicated SOC operator escalation</li>
+            <li>✓ Real GPS mobile streaming</li>
+            <li>✓ Synchronized flight record replay</li>
+          </ul>
+          <button class="btn btn-primary" id="btnSelectFleet">Select Fleet Plan</button>
+        </div>
+
+        <div class="pricing-card">
+          <div class="pricing-tier">Enterprise SOC Partner</div>
+          <div class="pricing-price">Custom<span>/fleet</span></div>
+          <p class="pricing-summary">Turnkey software integration for licensed private security firms.</p>
+          <ul class="pricing-features">
+            <li>✓ White-label command operations center</li>
+            <li>✓ Zero capex partner model</li>
+            <li>✓ Multi-drone supervision per pilot</li>
+            <li>✓ Regulatory compliance audit exports</li>
+          </ul>
+          <button class="btn btn-outline" id="btnSelectEnterprise">Partner Contact</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer class="site-footer">
+    <div class="container footer-content">
+      <div class="footer-left">
+        <div class="brand">
+          <span class="radar-pulse"></span>
+          <span>DRONE ESCORTS</span>
+        </div>
+        <p class="footer-desc">
+          AI-assisted aerial escort and supervised airspace platform. Built with Node standard library, SQLite, and Server-Sent Events.
+        </p>
+      </div>
+      <div class="footer-right">
+        <div class="footer-col">
+          <strong>Architecture</strong>
+          <a href="#overview">Overview</a>
+          <a href="#fleet">Fleet Status</a>
+          <a href="#architecture">SRS Compliance</a>
+        </div>
+        <div class="footer-col">
+          <strong>Quick Demo</strong>
+          <button class="link-btn" id="footDemoSub">Demo Subscriber</button>
+          <button class="link-btn" id="footDemoOps">Demo SOC Operator</button>
+        </div>
+      </div>
+    </div>
+    <div class="container footer-bottom">
+      <span>© 2026 Drone Escorts Platform. Flight dynamics simulated for Phase 1.</span>
+      <span class="footer-status"><span class="status-dot"></span> All systems nominal</span>
+    </div>
+  </footer>
+</div>
+
+<!-- ===================== AUTH MODAL DIALOG ===================== -->
+<div class="modal-backdrop" id="authModal" hidden>
   <div class="auth-card">
-    <div class="brand"><span class="dot"></span>DRONE ESCORTS</div>
-    <div class="tag">Supervised aerial escort for journeys that carry risk.</div>
+    <button class="modal-close" id="btnAuthClose" aria-label="Close modal">&times;</button>
+    <div class="brand-auth">
+      <span class="radar-pulse"></span>
+      <span>DRONE ESCORTS</span>
+    </div>
+    <div class="auth-tagline">Access the live aerial surveillance network.</div>
+
+    <!-- Quick Demo One-Click Access -->
+    <div class="auth-quick-demos">
+      <span class="quick-demo-title">⚡ ONE-CLICK DEMO ACCOUNTS</span>
+      <div class="quick-demo-buttons">
+        <button type="button" class="btn-demo-pill" id="quickSubBtn">
+          <span>Subscriber</span>
+          <small>subscriber@example.com</small>
+        </button>
+        <button type="button" class="btn-demo-pill" id="quickOpsBtn">
+          <span>Security Operator</span>
+          <small>operator@example.com</small>
+        </button>
+      </div>
+    </div>
+
+    <div class="auth-divider"><span>OR SIGN IN WITH CREDENTIALS</span></div>
 
     <div class="tabs" role="group">
       <button id="tabLogin" aria-pressed="true">Sign in</button>
@@ -25,7 +490,7 @@
         <label class="fld" for="aName">Full name</label>
         <input type="text" id="aName" autocomplete="name" placeholder="Amina Bello">
       </div>
-      <label class="fld" for="aEmail">Email</label>
+      <label class="fld" for="aEmail">Email address</label>
       <input type="email" id="aEmail" autocomplete="email" required placeholder="you@example.com">
       <label class="fld" for="aPass">Password</label>
       <input type="password" id="aPass" autocomplete="current-password" required
@@ -40,46 +505,72 @@
       <div class="err" id="authErr"></div>
       <button class="btn btn-primary" id="authGo" type="submit">Sign in</button>
     </form>
-
-    <div class="auth-note">
-      Create one subscriber account and one operator account to see both sides. Open the operator
-      account in a second browser or a private window — alerts appear there live.
-    </div>
   </div>
 </div>
 
-<!-- ===================== APP ===================== -->
-<header hidden id="chrome">
-  <div class="brand"><span class="dot"></span>DRONE ESCORTS</div>
-  <span class="tagchip" id="srcChip">—</span>
-  <span class="tagchip" id="linkChip">CONNECTING</span>
-  <div class="roles" role="group" id="roleSwitch" hidden>
-    <button id="rSub" aria-pressed="true">Subscriber</button>
-    <button id="rOps" aria-pressed="false">Command (SOC)</button>
-  </div>
-  <div class="who">
-    <span id="whoName"></span>
-    <span class="clock" id="clock">--:--:--</span>
-    <button class="btn-sm" id="btnLogout">Sign out</button>
-  </div>
-</header>
+<!-- ===================== LIVE MISSION CONSOLE (APP VIEW) ===================== -->
+<div id="appContainer" hidden>
+  <header id="chrome">
+    <div class="chrome-left">
+      <button class="btn-back-home" id="btnBackHome" title="Return to Overview">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+        <span>Overview</span>
+      </button>
+      <div class="brand">
+        <span class="radar-pulse"></span>
+        <span class="brand-name">DRONE ESCORTS</span>
+      </div>
+      <span class="tagchip" id="srcChip">—</span>
+      <span class="tagchip" id="linkChip">CONNECTING</span>
+    </div>
 
-<main hidden id="app">
-  <div class="col" id="colLeft"></div>
-  <div class="map-wrap"><div id="map"></div></div>
-  <div class="col" id="colRight"></div>
-</main>
+    <div class="roles" role="group" id="roleSwitch" hidden>
+      <button id="rSub" aria-pressed="true">Subscriber View</button>
+      <button id="rOps" aria-pressed="false">Command (SOC)</button>
+    </div>
 
+    <div class="who">
+      <span class="user-chip" id="whoName"></span>
+      <span class="clock" id="clock">--:--:--</span>
+      <button class="btn-sm btn-logout" id="btnLogout">Sign out</button>
+    </div>
+  </header>
+
+  <!-- Mobile Console Tab Switcher -->
+  <div class="mobile-console-tabs" id="mobileConsoleTabs">
+    <button class="m-tab active" data-pane="colLeft">🎛️ Controls</button>
+    <button class="m-tab" data-pane="mapWrap">🗺️ Live Map</button>
+    <button class="m-tab" data-pane="colRight">📡 Telemetry</button>
+  </div>
+
+  <main id="app">
+    <div class="col" id="colLeft"></div>
+    <div class="map-wrap" id="mapWrap">
+      <div id="map"></div>
+    </div>
+    <div class="col" id="colRight"></div>
+  </main>
+</div>
+
+<!-- Emergency SOS Red Alert Frame -->
 <div class="sos-frame" id="sosFrame" hidden></div>
 
+<!-- SOS Cancellation Window Modal -->
 <div class="ovl" id="sosModal" hidden>
   <div class="sheet">
-    <h2>Emergency SOS</h2>
-    <p>Releasing this alert notifies the operations centre, your emergency contacts, and begins
-       protected recording. Cancel within the window if this was accidental.</p>
+    <div class="sos-modal-header">
+      <span class="sos-badge">EMERGENCY PROTOCOL</span>
+      <h2>Emergency SOS Triggered</h2>
+    </div>
+    <p>
+      Releasing this alert broadcasts your coordinates to the security operations centre, notifies your emergency contacts, 
+      and locks high-rate protected recording. Cancel within the window if this was accidental.
+    </p>
     <div class="count" id="sosCount">5</div>
-    <button class="btn btn-ghost" id="sosCancel">Cancel — I'm safe</button>
-    <button class="btn btn-sos" id="sosNow" style="margin-top:8px">Send now</button>
+    <div class="sos-actions">
+      <button class="btn btn-ghost" id="sosCancel">Cancel — I'm safe</button>
+      <button class="btn btn-sos" id="sosNow">Send Alert Now</button>
+    </div>
   </div>
 </div>
 

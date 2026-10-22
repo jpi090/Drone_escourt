@@ -1,6 +1,10 @@
 'use strict';
-/* Drone Escorts client. Talks to the API; the server owns all mission state.
-   Structural HTML is rebuilt only when a signature changes so inputs survive updates. */
+/* Drone Escorts client.
+   Features:
+   - Full Home/Overview showcase with dynamic fleet status and quick demo logins
+   - Mission Console with server-authoritative flight engine, SSE sync, Leaflet map,
+     synthetic camera feed, SOS triage, and sealed replay.
+*/
 
 const $ = s => document.querySelector(s);
 const el = id => document.getElementById(id);
@@ -10,7 +14,7 @@ const mmss = s => `${pad(Math.floor(s / 60))}:${pad(Math.floor(s % 60))}`;
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 const S = {
-  user: null, view: 'sub', mission: null, advisories: [], sos: null,
+  user: null, currentScreen: 'home', view: 'sub', mission: null, advisories: [], sos: null,
   notifications: [], history: [], fleet: [], modes: {}, reserve: 22,
   activeMissions: [], openSos: [], audit: [], allAdvisories: [],
   droneId: 'DE-114', mode: 'car', source: 'sim',
@@ -18,7 +22,7 @@ const S = {
   sosCountdown: 0, sosTimer: null, replay: null, sig: '', es: null, linkOk: false,
 };
 
-/* ------------------------------------------------------------------ fetch */
+/* ------------------------------------------------------------------ fetch & toast */
 async function api(path, opts = {}) {
   const res = await fetch(path, {
     method: opts.method || 'GET',
@@ -31,7 +35,8 @@ async function api(path, opts = {}) {
   if (!res.ok) throw Object.assign(new Error(data.error || `HTTP ${res.status}`), { data, status: res.status });
   return data;
 }
-function toast(msg, ms = 3800) {
+
+function toast(msg, ms = 4000) {
   const prev = $('.toast'); if (prev) prev.remove();
   const t = document.createElement('div');
   t.className = 'toast'; t.textContent = msg;
@@ -39,24 +44,74 @@ function toast(msg, ms = 3800) {
   setTimeout(() => t.remove(), ms);
 }
 
-/* ------------------------------------------------------------------ auth UI */
+/* ------------------------------------------------------------------ screen navigation */
+function switchScreen(screen) {
+  S.currentScreen = screen;
+  if (screen === 'app') {
+    if (!S.user) {
+      openAuthModal('login');
+      toast('Please sign in or select a quick demo account to enter Mission Console.');
+      return;
+    }
+    el('homeView').hidden = true;
+    el('appContainer').hidden = false;
+    document.body.style.overflow = 'hidden';
+    initMap();
+    setTimeout(() => { map && map.invalidateSize(); }, 80);
+    render();
+  } else {
+    el('homeView').hidden = false;
+    el('appContainer').hidden = true;
+    document.body.style.overflow = 'auto';
+  }
+
+  // Update navigation active states
+  document.querySelectorAll('.nav-link').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.nav === screen);
+  });
+}
+
+function updateNavAuth() {
+  const isAuth = !!S.user;
+  el('navGuestActions').hidden = isAuth;
+  el('navUserActions').hidden = !isAuth;
+  if (isAuth) {
+    el('navUserName').textContent = S.user.name;
+    el('navUserRole').textContent = S.user.role === 'operator' ? 'Security Operator' : 'Subscriber';
+    el('navUserAvatar').textContent = (S.user.name || 'U').charAt(0).toUpperCase();
+  }
+}
+
+/* ------------------------------------------------------------------ auth modal UI */
 let authMode = 'login', authRole = 'subscriber';
-function setAuthMode(m) {
-  authMode = m;
-  el('tabLogin').setAttribute('aria-pressed', m === 'login');
-  el('tabRegister').setAttribute('aria-pressed', m === 'register');
-  el('nameRow').hidden = m === 'login';
-  el('roleRow').hidden = m === 'login';
-  el('aPass').autocomplete = m === 'login' ? 'current-password' : 'new-password';
-  el('authGo').textContent = m === 'login' ? 'Sign in' : 'Create account';
+
+function openAuthModal(mode = 'login') {
+  authMode = mode;
+  el('authModal').hidden = false;
+  el('tabLogin').setAttribute('aria-pressed', mode === 'login');
+  el('tabRegister').setAttribute('aria-pressed', mode === 'register');
+  el('nameRow').hidden = mode === 'login';
+  el('roleRow').hidden = mode === 'login';
+  el('aPass').autocomplete = mode === 'login' ? 'current-password' : 'new-password';
+  el('authGo').textContent = mode === 'login' ? 'Sign in' : 'Create account';
   el('authErr').textContent = '';
 }
-el('tabLogin').onclick = () => setAuthMode('login');
-el('tabRegister').onclick = () => setAuthMode('register');
+
+function closeAuthModal() {
+  el('authModal').hidden = true;
+  el('authErr').textContent = '';
+}
+
+el('tabLogin').onclick = () => openAuthModal('login');
+el('tabRegister').onclick = () => openAuthModal('register');
+el('btnAuthClose').onclick = closeAuthModal;
+el('authModal').onclick = e => { if (e.target === el('authModal')) closeAuthModal(); };
+
 document.querySelectorAll('[data-role]').forEach(b => b.onclick = () => {
   authRole = b.dataset.role;
   document.querySelectorAll('[data-role]').forEach(x => x.setAttribute('aria-pressed', x === b));
 });
+
 el('authForm').onsubmit = async e => {
   e.preventDefault();
   el('authErr').textContent = '';
@@ -65,15 +120,150 @@ el('authForm').onsubmit = async e => {
   try {
     const r = await api(`/api/auth/${authMode}`, { method: 'POST', body });
     S.user = r.user;
-    await start();
-  } catch (err) { el('authErr').textContent = err.message; }
+    closeAuthModal();
+    updateNavAuth();
+    await startConsole();
+    toast(`Welcome, ${r.user.name}!`);
+  } catch (err) {
+    el('authErr').textContent = err.message;
+  }
 };
-el('btnLogout').onclick = async () => {
+
+/* ------------------------------------------------------------------ quick demo login */
+async function quickLogin(email, password, desiredRole) {
+  try {
+    let r;
+    try {
+      r = await api('/api/auth/login', { method: 'POST', body: { email, password } });
+    } catch {
+      // If demo account doesn't exist yet in db, auto-create it
+      const name = desiredRole === 'operator' ? 'Command Operator' : 'Demo Subscriber';
+      r = await api('/api/auth/register', {
+        method: 'POST',
+        body: { email, password, name, role: desiredRole }
+      });
+    }
+    S.user = r.user;
+    S.view = desiredRole === 'operator' ? 'ops' : 'sub';
+    closeAuthModal();
+    updateNavAuth();
+    await startConsole();
+    toast(`Authenticated as ${r.user.name} (${r.user.role})`);
+  } catch (err) {
+    toast(`Login error: ${err.message}`);
+  }
+}
+
+// Quick demo buttons wiring
+el('quickSubBtn').onclick = () => quickLogin('subscriber@example.com', 'password123', 'subscriber');
+el('quickOpsBtn').onclick = () => quickLogin('operator@example.com', 'password123', 'operator');
+el('menuDemoSub').onclick = () => quickLogin('subscriber@example.com', 'password123', 'subscriber');
+el('menuDemoOps').onclick = () => quickLogin('operator@example.com', 'password123', 'operator');
+el('heroLaunchSub').onclick = () => quickLogin('subscriber@example.com', 'password123', 'subscriber');
+el('heroLaunchOps').onclick = () => quickLogin('operator@example.com', 'password123', 'operator');
+el('btnLaunchSubCard').onclick = () => quickLogin('subscriber@example.com', 'password123', 'subscriber');
+el('btnLaunchOpsCard').onclick = () => quickLogin('operator@example.com', 'password123', 'operator');
+el('footDemoSub').onclick = () => quickLogin('subscriber@example.com', 'password123', 'subscriber');
+el('footDemoOps').onclick = () => quickLogin('operator@example.com', 'password123', 'operator');
+
+// Top nav buttons
+el('btnOpenAuth').onclick = () => openAuthModal('login');
+el('btnOpenRegister').onclick = () => openAuthModal('register');
+el('navConsoleBtn').onclick = () => switchScreen('app');
+el('brandHomeBtn').onclick = () => switchScreen('home');
+el('btnBackHome').onclick = () => switchScreen('home');
+
+// Pricing buttons
+el('btnSelectPersonal').onclick = () => openAuthModal('register');
+el('btnSelectFleet').onclick = () => quickLogin('subscriber@example.com', 'password123', 'subscriber');
+el('btnSelectEnterprise').onclick = () => quickLogin('operator@example.com', 'password123', 'operator');
+
+/* ------------------------------------------------------------------ theme */
+document.documentElement.removeAttribute('data-theme');
+localStorage.removeItem('de_theme');
+
+// Nav scrolling
+document.querySelectorAll('[data-nav]').forEach(btn => {
+  btn.onclick = () => {
+    const target = btn.dataset.nav;
+    if (target === 'home') {
+      switchScreen('home');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } else {
+      switchScreen('home');
+      const sec = el(target);
+      if (sec) sec.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+});
+
+/* ------------------------------------------------------------------ mobile drawer & tabs */
+const btnNavToggle = el('btnNavToggle');
+const mobileNavDrawer = el('mobileNavDrawer');
+if (btnNavToggle && mobileNavDrawer) {
+  btnNavToggle.onclick = () => {
+    const isHidden = mobileNavDrawer.hidden;
+    mobileNavDrawer.hidden = !isHidden;
+    btnNavToggle.classList.toggle('open', isHidden);
+  };
+}
+function closeMobileNav() {
+  if (mobileNavDrawer) mobileNavDrawer.hidden = true;
+  if (btnNavToggle) btnNavToggle.classList.remove('open');
+}
+document.querySelectorAll('.m-nav-link').forEach(btn => {
+  btn.onclick = () => {
+    closeMobileNav();
+    const target = btn.dataset.nav;
+    if (target === 'home') {
+      switchScreen('home');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } else {
+      switchScreen('home');
+      const sec = el(target);
+      if (sec) sec.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+});
+el('mNavConsoleBtn') && (el('mNavConsoleBtn').onclick = () => {
+  closeMobileNav();
+  switchScreen('app');
+});
+
+// Mobile Console Pane Switcher
+let activePane = 'colLeft';
+function setConsolePane(paneId) {
+  activePane = paneId;
+  document.querySelectorAll('.m-tab').forEach(t => {
+    t.classList.toggle('active', t.dataset.pane === paneId);
+  });
+  const panes = ['colLeft', 'mapWrap', 'colRight'];
+  panes.forEach(p => {
+    const elem = el(p);
+    if (elem) elem.classList.toggle('pane-active', p === paneId);
+  });
+  if (paneId === 'mapWrap' && map) {
+    setTimeout(() => map.invalidateSize(), 60);
+  }
+}
+document.querySelectorAll('.m-tab').forEach(t => {
+  t.onclick = () => setConsolePane(t.dataset.pane);
+});
+setConsolePane('colLeft');
+
+
+// Logout
+const handleLogout = async () => {
   stopGps();
   if (S.es) S.es.close();
   await api('/api/auth/logout', { method: 'POST' }).catch(() => {});
-  location.reload();
+  S.user = null;
+  updateNavAuth();
+  switchScreen('home');
+  toast('Signed out successfully.');
 };
+el('btnLogout').onclick = handleLogout;
+el('navSignOutBtn').onclick = handleLogout;
 
 /* ------------------------------------------------------------------ map */
 let map, layers = { track: null, veh: null, drone: null, leash: null, adv: [], sos: null, ghost: null, others: [] };
@@ -81,6 +271,8 @@ const icon = (html, cls, size) => L.divIcon({ html, className: 'mk ' + cls, icon
 
 function initMap() {
   if (map) return;
+  const container = el('map');
+  if (!container) return;
   map = L.map('map', { zoomControl: false }).setView([6.456, 3.51], 12);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
     { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(map);
@@ -240,9 +432,6 @@ function applyEvent(evt) {
       break;
     case 'fleet': {
       S.fleet = evt.fleet;
-      // the gate depends on battery, so re-check while a docked drone charges.
-      // render() rebuilds only if the blocked-check count changed, so an open
-      // dropdown is not torn down on every charge tick.
       if (!S.mission) loadChecks().then(render);
       break;
     }
@@ -280,6 +469,7 @@ async function launch() {
     S.mission = r.mission;
     followedOnce = false;
     await refresh();
+    toast('Mission created & launched! Drone airborne.');
   } catch (err) {
     toast((err.data && err.data.refused) ? 'Launch refused — ' + err.data.refused.join('; ') : err.message, 6000);
   }
@@ -319,6 +509,7 @@ el('sosNow').onclick = () => sosFire(false);
 
 /* ------------------------------------------------------------------ video */
 function paintVideo(cv, m) {
+  if (!cv) return;
   const ctx = cv.getContext('2d');
   const W = cv.width = Math.max(120, cv.clientWidth * .75);
   const H = cv.height = Math.max(80, cv.clientHeight * .75);
@@ -368,7 +559,7 @@ function statePill(m) {
 }
 function advPill() {
   const raised = S.advisories.filter(a => a.raised);
-  if (!raised.length) return '<span class="pill p-green">Green · nothing reported</span>';
+  if (!raised.length) return '<span class="pill p-green">Green · normal</span>';
   const worst = ['red', 'orange', 'yellow'].find(l => raised.some(a => a.level === l)) || 'green';
   return `<span class="pill p-${worst}">${worst[0].toUpperCase() + worst.slice(1)} · ${raised.length} advisory</span>`;
 }
@@ -402,7 +593,6 @@ function render() {
     S.notifications.length, S.audit.length, S.history.length,
     S.advisories.filter(a => a.raised).length, S.allAdvisories.filter(a => a.raised).length,
     S.activeMissions.map(x => x.id + x.state).join(','),
-    // per-alert triage state, so Acknowledge/Escalate/Resolve re-enable as it changes
     S.openSos.map(x => `${x.id}${!!x.ack_at}${!!x.escalated_at}`).join(','),
     S.checks.filter(c => !c.ok).length, S.replay ? S.replay.id : '-', !!S.gpsErr, !!S.lastFix,
   ].join('~');
@@ -415,7 +605,6 @@ function render() {
 function renderSub() {
   const m = S.mission, s = S.sos;
   const blocked = S.checks.filter(c => !c.ok);
-  const drone = S.fleet.find(d => d.id === S.droneId);
 
   el('colLeft').innerHTML = `
     <div class="card">
@@ -614,11 +803,13 @@ function renderOps() {
     <div class="card">
       <h3>SOS triage queue · ${open.length}</h3>
       ${open.length ? open.map(s => `
-        <div class="mission sos">
-          <div class="top"><span class="nm">${esc(s.id)}</span>
-            <span class="sla" data-sla="${esc(s.id)}" data-at="${s.triggered_at}">—</span></div>
-          <div class="meta">${esc(s.mission_id || 'no active mission')} · ${s.silent ? 'SILENT' : 'standard'}</div>
-          <div class="meta" style="margin-top:4px">raised ${hhmmss(new Date(s.triggered_at))}${
+        <div class="triage-item">
+          <div class="row" style="justify-content:space-between">
+            <span style="font-weight:700;color:#fff">${esc(s.id)}</span>
+            <span class="sla-timer" data-sla="${esc(s.id)}" data-at="${s.triggered_at}">—</span>
+          </div>
+          <div class="note" style="margin-top:0">${esc(s.mission_id || 'no active mission')} · ${s.silent ? 'SILENT ALERT' : 'STANDARD ALERT'}</div>
+          <div class="note" style="margin-top:2px">raised ${hhmmss(new Date(s.triggered_at))}${
             s.ack_at ? ` · ack ${hhmmss(new Date(s.ack_at))} by ${esc(s.ack_by)}` : ''}${
             s.escalated_at ? ` · escalated ${hhmmss(new Date(s.escalated_at))}` : ''}</div>
           <div class="btn-row">
@@ -633,10 +824,10 @@ function renderOps() {
     <div class="card">
       <h3>Active missions · ${S.activeMissions.length}</h3>
       ${S.activeMissions.length ? S.activeMissions.map(m => `
-        <div class="mission ${open.some(s => s.mission_id === m.id) ? 'sos' : ''}">
-          <div class="top"><span class="nm">${esc(m.id)}</span>${statePill(m)}</div>
-          <div class="meta">${esc(m.drone_id)} · RPIC ${esc(m.rpic)} · ${esc(m.source)} positioning</div>
-          <div class="meta" data-mm="${esc(m.id)}" style="margin-top:4px">—</div>
+        <div class="card" style="margin-bottom:8px;background:rgba(255,255,255,0.03);padding:10px">
+          <div class="row" style="justify-content:space-between"><span style="font-weight:700">${esc(m.id)}</span>${statePill(m)}</div>
+          <div class="note">${esc(m.drone_id)} · RPIC ${esc(m.rpic)} · ${esc(m.source)} positioning</div>
+          <div class="note" data-mm="${esc(m.id)}" style="margin-top:4px">—</div>
           <div class="bar"><i data-mbar="${esc(m.id)}" style="width:${m.battery}%"></i></div>
           <div class="btn-row">
             <button class="btn-sm" data-adv="${esc(m.id)}">+ Raise advisory</button>
@@ -648,12 +839,12 @@ function renderOps() {
 
     <div class="card">
       <h3>Fleet health</h3>
-      ${S.fleet.map(d => `<div class="mission">
-        <div class="top"><span class="nm">${esc(d.id)}</span>
+      ${S.fleet.map(d => `<div style="margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--line)">
+        <div class="row" style="justify-content:space-between"><span style="font-family:var(--font-mono);font-weight:700">${esc(d.id)}</span>
           <span class="pill ${d.airworthiness === 'ok' ? (d.status === 'airborne' ? 'p-green' : 'p-idle') : 'p-orange'}">${
             d.airworthiness === 'ok' ? (d.status === 'airborne' ? 'Airborne' : 'Docked') : 'Maintenance'}</span></div>
-        <div class="meta">${esc(d.model)} · fw ${esc(d.firmware)} · ${d.cycles} cycles</div>
-        <div class="meta" style="margin-top:3px">${esc(d.dock)}</div>
+        <div class="note">${esc(d.model)} · fw ${esc(d.firmware)} · ${d.cycles} cycles</div>
+        <div class="note" style="margin-top:2px">${esc(d.dock)}</div>
         <div class="bar"><i style="width:${d.battery}%;background:var(--green)"></i></div>
       </div>`).join('')}
     </div>`;
@@ -687,14 +878,16 @@ function renderOps() {
 
     <div class="card">
       <h3>Audit log · append-only</h3>
-      <div class="audit">${S.audit.length ? S.audit.map(a =>
-        `<div><b>${esc(a.actor)}</b> ${esc(a.action)}<br>${hhmmss(new Date(a.ts))} · ${esc(a.detail)}</div>`).join('')
+      <div class="feed" style="font-family:var(--font-mono);font-size:11px">${S.audit.length ? S.audit.map(a =>
+        `<div class="item" style="border-left-color:var(--cyan)"><b>${esc(a.actor)} · ${esc(a.action)}</b>
+        <small>${hhmmss(new Date(a.ts))}</small><p>${esc(a.detail)}</p></div>`).join('')
         : '<div class="empty">No events yet.</div>'}</div>
     </div>`;
 
   if (S.activeMissions[0]) paintVideo(el('cv'), S.activeMissions[0]);
   wireOps();
 }
+
 function wireOps() {
   document.querySelectorAll('[data-ack]').forEach(b => b.onclick = () => sosAct(b.dataset.ack, 'ack'));
   document.querySelectorAll('[data-esc]').forEach(b => b.onclick = () => sosAct(b.dataset.esc, 'escalate'));
@@ -709,7 +902,7 @@ function wireOps() {
     try {
       await api('/api/ops/advisories', { method: 'POST',
         body: { missionId: b.dataset.adv, level: 'orange', category: 'Operator advisory', description } });
-      toast('Advisory sent to the subscriber.');
+      toast('Advisory broadcasted to the subscriber.');
     } catch (e) { toast(e.message); }
   });
 }
@@ -732,12 +925,12 @@ function tickDom() {
   set('hClock', hhmmss(new Date()));
   if (S.sos && !S.sos.resolved_at) {
     const w = Math.round((Date.now() - S.sos.triggered_at) / 1000);
-    set('sSla', S.sos.ack_at ? 'ACK' : `waiting ${w}s`);
+    set('sSla', S.sos.ack_at ? 'ACKNOWLEDGED' : `WAITING ${w}s`);
   }
   document.querySelectorAll('[data-sla]').forEach(n => {
     const s = S.openSos.find(x => x.id === n.dataset.sla);
     if (!s) return;
-    n.textContent = s.ack_at ? 'ACK' : `UNACK ${Math.round((Date.now() - s.triggered_at) / 1000)}s`;
+    n.textContent = s.ack_at ? 'ACKNOWLEDGED' : `UNACK ${Math.round((Date.now() - s.triggered_at) / 1000)}s`;
   });
   document.querySelectorAll('[data-mm]').forEach(n => {
     const mm = S.activeMissions.find(x => x.id === n.dataset.mm);
@@ -760,22 +953,37 @@ el('rSub') && (el('rSub').onclick = () => { S.view = 'sub'; S.sig = ''; followed
 el('rOps') && (el('rOps').onclick = () => { S.view = 'ops'; S.sig = ''; followedOnce = false; render(); });
 window.addEventListener('resize', () => { map && map.invalidateSize(); render(); });
 
-async function start() {
-  el('auth').hidden = true;
-  el('chrome').hidden = false;
-  el('app').hidden = false;
-  initMap();
-  setTimeout(() => map.invalidateSize(), 60);
+async function startConsole() {
+  switchScreen('app');
   await refresh();
-  S.view = S.user.role === 'operator' ? 'ops' : 'sub';
   connectStream();
   if (S.source === 'gps') startGps();
-  setInterval(() => { el('clock').textContent = hhmmss(new Date()); tickDom(); }, 500);
-  setInterval(() => { if (!S.linkOk) refresh().then(render).catch(() => {}); }, 5000);
   S.sig = ''; render();
 }
 
+setInterval(() => {
+  const now = hhmmss(new Date());
+  const c = el('clock'); if (c) c.textContent = now;
+  tickDom();
+}, 500);
+setInterval(() => { if (!S.linkOk && S.user) refresh().then(render).catch(() => {}); }, 5000);
+
+// Initialize app on load
 (async () => {
-  try { const r = await api('/api/me'); S.user = r.user; await start(); }
-  catch { setAuthMode('login'); }
+  try {
+    const r = await api('/api/me');
+    S.user = r.user;
+    updateNavAuth();
+    S.view = S.user.role === 'operator' ? 'ops' : 'sub';
+    // Start on overview page by default or switch if user already has active mission
+    await refresh();
+    if (S.mission || (S.user.role === 'operator' && S.openSos.length > 0)) {
+      await startConsole();
+    } else {
+      switchScreen('home');
+    }
+  } catch {
+    updateNavAuth();
+    switchScreen('home');
+  }
 })();
